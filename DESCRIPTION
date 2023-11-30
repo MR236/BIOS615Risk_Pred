@@ -1,0 +1,13 @@
+Package: RISKmis
+Type: Package
+Title: Implements Method Described in "Risk Prediction with imperfect survival outcome information from electronic health records" [Hou et al. Biometrics 2021].
+Version: 1.0
+Date: 2023-11-27
+Author: Malcolm Risk, Wenqing Qian, Siqiao Chen 
+Maintainer: Malcolm Risk <mhrisk@umich.edu>
+Imports: MASS, survival, doRNG, Matrix, splines, glmnet, stats
+Description: In "Risk Prediction with imperfect survival outcome information from electronic health records", authors Jue Hou, Stephanie F. Chan, Xuan Wang, and Tianxi Cai describe a method for conducting risk prediction on survival outcome date when we only have gold standard data for a small subset of observations. This package builds on the authors' original implementation by making several important computational improvements, cutting down overall computation time by at least a factor of four. 
+License: GPL (>= 3)
+RoxygenNote: 7.2.3
+Encoding: UTF-8
+
