@@ -1,0 +1,131 @@
+---
+title: "RISKmisTESTING"
+output: pdf_document
+date: "2023-12-14"
+---
+
+## Package Installation
+
+```{r}
+library(devtools)
+library(survival)
+library(doRNG)
+library(glmnet)
+library(ggplot2)
+library(data.table)
+library(dplyr)
+library(MASS)
+devtools::install_github("MR236/BIOS615Risk_Pred")
+library(RISKmis)
+```
+## Testing of Initial Estimator Function
+
+First we generate some data using the authors' original specifications:
+
+```{r}
+n <- 10000
+m <- 500
+beta0 <- c(0.7,0.7,0.7,-0.5,-0.5,-0.5,0.3,0.3,0.3,0)
+p <- length(beta0)
+sigmaZ <- 1
+misT <- noise.loglinear.S
+sim_data <- sim.gen.rev(n, beta0, sigmaZ,m,misT)
+labelled_data <- sim_data$data[1:m,]
+```
+
+Then we can get estimates using the original method and our method:
+
+```{r}
+betadelta <- init.beta.new(delta = labelled_data$delta,C=labelled_data$C,Z = labelled_data$Z)$beta
+betadelta
+
+# original method requires a bit of extra preparation
+h = sd(labelled_data$C)/(sum(labelled_data$delta))^0.26
+KC = dnorm(as.matrix(dist(labelled_data$C/h,diag=T,upper=T)))/h
+betadelta_old <- init.beta(delta = labelled_data$delta,Z = labelled_data$Z,KC=KC, link=expit, dlink=dexpit)
+betadelta_old
+```
+Note that the results are not exactly the same but very similar. Asymptotic bias and MSE are near-identical as shown in simulations (see paper). Note the superior speed of our method is clear even with this relatively small sample size. 
+
+## Testing of Score Function
+
+First some data pre-processing:
+
+```{r}
+data <- sim_data$data
+dataS <- sim_data$dataS
+beta.std = betadelta/sqrt(sum(betadelta^2))
+lp = drop(data$Z %*% beta.std)
+sdlp = sd(lp)
+
+h1 = sdlp/(sum(dataS$delta1))^0.3
+h2 = sdlp/(sum(dataS$delta2))^0.3
+```
+
+Then we calculate the score using our function and the original:
+
+```{r}
+# Our method
+Sk = rep(0,p*2)
+Sk[1:p] = Sk_sym_new(lp,data$Z,
+                         dataS$X1,dataS$delta1,
+                         data$C,h1)
+Sk[p+1:p] = Sk_sym_new(lp,data$Z,
+                           dataS$X2,dataS$delta2,
+                           data$C,h2)
+
+# old_method
+Sk_old = rep(0,p*2)
+Sk_old[1:p] = Sk_sym(lp,data$Z,
+                       dataS$X1,dataS$delta1,
+                       data$C,dnorm,h1)
+Sk_old[p+1:p] = Sk_sym(lp,data$Z,
+                         dataS$X2,dataS$delta2,
+                         data$C,dnorm,h2)
+
+Sk-Sk_old
+```
+
+There are two separate function calls for each method, one for each of the two surrogate outcomes in the simulation scenario. Note the extremely small approximation errors displayed and large computational efficiency advantage for our method.
+
+## Testing of the Full Method
+
+To demonstrate the full method we will use a much smaller dimension of data, as the full method involves calling the above functions 1000 times each.
+
+```{r}
+n <- 1000
+m <- 250
+beta0 <- c(0.7,0.7,0.7,-0.5,-0.5,-0.5,0.3,0.3,0.3,0)
+p <- length(beta0)
+sigmaZ <- 1
+misT <- noise.loglinear.S
+sim_data <- sim.gen.rev(n, beta0, sigmaZ,m,misT)
+data_labelled <- sim_data$data
+data_unlabelled <- sim_data$dataS
+```
+
+Our method, taking around 45 seconds:
+
+```{r}
+t1 <- Sys.time()
+result <- Full_Estimator_New(data_labelled, data_unlabelled, n=n, m=m, Nperturb=500)
+t2 <- Sys.time()
+time_new <- t2-t1
+# time to run
+time_new
+# estimated coefficients
+result[[1]]
+```
+
+Authors' method, taking around 3 minutes:
+
+```{r}
+t1 <- Sys.time()
+result_old <- Full_Estimator_Original(data_labelled, data_unlabelled, n=n,m=m, Nperturb=500)
+t2 <- Sys.time()
+time_old <- t2-t1
+# time to run
+time_old
+# estimated coefficients
+result_old[[1]]
+```
